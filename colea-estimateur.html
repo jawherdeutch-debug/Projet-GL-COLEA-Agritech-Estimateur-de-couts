@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COLEA – Estimation PolyBloom</title>
+  <style>
+    :root { --green:#176b4d; --light:#f3f7f4; --border:#dce5df; --text:#1f2933; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:32px 16px; background:var(--light); color:var(--text);
+           font-family:Arial, sans-serif; }
+    main { max-width:850px; margin:auto; }
+    header { margin-bottom:24px; }
+    h1 { margin:0 0 8px; color:var(--green); }
+    .intro { color:#52615a; line-height:1.5; }
+    .panel { background:white; border:1px solid var(--border); border-radius:14px;
+             padding:22px; margin:18px 0; box-shadow:0 3px 12px #183b2810; }
+    h2 { margin:0 0 18px; font-size:1.2rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    label { display:block; font-weight:600; font-size:.92rem; margin-bottom:7px; }
+    input { width:100%; padding:11px 12px; border:1px solid #bdcbc2; border-radius:8px;
+            font-size:1rem; }
+    input:focus { outline:2px solid #9bc9b2; border-color:var(--green); }
+    .hint { color:#64736a; font-size:.82rem; margin-top:5px; }
+    button { border:0; border-radius:8px; padding:12px 18px; background:var(--green);
+             color:white; font-weight:700; cursor:pointer; margin-top:18px; }
+    button:hover { background:#10563d; }
+    .results { display:none; }
+    table { width:100%; border-collapse:collapse; }
+    td { padding:12px 4px; border-bottom:1px solid var(--border); }
+    td:last-child { text-align:right; font-weight:600; }
+    .total { color:var(--green); font-size:1.15rem; }
+    .notice { background:#fff8e7; border:1px solid #f0dfae; padding:12px;
+              border-radius:8px; color:#665323; font-size:.88rem; line-height:1.45; }
+    @media(max-width:600px) { .grid { grid-template-columns:1fr; } body { padding:20px 12px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>COLEA – Estimateur PolyBloom</h1>
+    <p class="intro">Saisissez les informations de votre huilerie pour estimer le volume
+      de margines ainsi que les coûts de traitement et de transport.</p>
+  </header>
+
+  <form id="estimateForm">
+    <section class="panel">
+      <h2>1. Informations de l'huilerie</h2>
+      <div class="grid">
+        <div>
+          <label for="millName">Nom de l'huilerie</label>
+          <input id="millName" name="millName" required placeholder="Ex. Huilerie du Nord">
+        </div>
+        <div>
+          <label for="contact">Nom du contact (facultatif)</label>
+          <input id="contact" name="contact" placeholder="Nom et prénom">
+        </div>
+        <div>
+          <label for="phone">Téléphone (facultatif)</label>
+          <input id="phone" name="phone" type="tel" placeholder="+216 ...">
+        </div>
+        <div>
+          <label for="oilLitres">Quantité d'huile produite (litres)</label>
+          <input id="oilLitres" name="oilLitres" type="number" min="0.01" step="any"
+                 required placeholder="Ex. 10000">
+        </div>
+        <div>
+          <label for="distance">Distance aller jusqu'au site (km)</label>
+          <input id="distance" name="distance" type="number" min="0" step="any"
+                 required placeholder="Ex. 30">
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>2. Paramètres de l'estimation</h2>
+      <div class="grid">
+        <div>
+          <label for="ratio">Ratio margines / huile (L/L)</label>
+          <input id="ratio" type="number" min="0" step="any" value="7" required>
+          <div class="hint">Hypothèse modifiable : 7 litres de margines par litre d'huile.</div>
+        </div>
+        <div>
+          <label for="treatmentPrice">Prix de traitement (TND/m³)</label>
+          <input id="treatmentPrice" type="number" min="0" step="any" value="35" required>
+        </div>
+        <div>
+          <label for="transportPrice">Prix de transport (TND/km)</label>
+          <input id="transportPrice" type="number" min="0" step="any" value="1.2" required>
+          <div class="hint">Calcul aller-retour : distance × 2.</div>
+        </div>
+        <div>
+          <label for="fixedFee">Frais fixes (TND)</label>
+          <input id="fixedFee" type="number" min="0" step="any" value="100" required>
+        </div>
+      </div>
+      <button type="submit">Calculer l'estimation</button>
+    </section>
+  </form>
+
+  <section class="panel results" id="results" aria-live="polite">
+    <h2>3. Résultats de l'estimation</h2>
+    <p id="customerName"></p>
+    <table>
+      <tr><td>Volume estimé des margines</td><td id="volumeResult">—</td></tr>
+      <tr><td>Coût de traitement</td><td id="treatmentResult">—</td></tr>
+      <tr><td>Coût de transport (aller-retour)</td><td id="transportResult">—</td></tr>
+      <tr><td>Frais fixes</td><td id="fixedResult">—</td></tr>
+      <tr class="total"><td>Coût total estimé</td><td id="totalResult">—</td></tr>
+    </table>
+    <button type="button" onclick="window.print()">Imprimer les résultats</button>
+  </section>
+
+  <p class="notice">Attention : les ratios et tarifs affichés sont des valeurs illustratives
+    destinées au prototype. Ils doivent être validés et remplacés par les paramètres
+    commerciaux réels de COLEA avant toute utilisation avec un client.</p>
+</main>
+
+<script>
+  const form = document.getElementById('estimateForm');
+  const money = value => new Intl.NumberFormat('fr-TN', {
+    style: 'currency', currency: 'TND', minimumFractionDigits: 3
+  }).format(value);
+
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const oilLitres = Number(document.getElementById('oilLitres').value);
+    const distance = Number(document.getElementById('distance').value);
+    const ratio = Number(document.getElementById('ratio').value);
+    const treatmentPrice = Number(document.getElementById('treatmentPrice').value);
+    const transportPrice = Number(document.getElementById('transportPrice').value);
+    const fixedFee = Number(document.getElementById('fixedFee').value);
+
+    const marginesM3 = (oilLitres * ratio) / 1000;
+    const treatmentCost = marginesM3 * treatmentPrice;
+    const transportCost = distance * 2 * transportPrice;
+    const total = treatmentCost + transportCost + fixedFee;
+
+    document.getElementById('customerName').textContent =
+      'Huilerie : ' + document.getElementById('millName').value;
+    document.getElementById('volumeResult').textContent =
+      marginesM3.toLocaleString('fr-TN', {maximumFractionDigits: 2}) + ' m³';
+    document.getElementById('treatmentResult').textContent = money(treatmentCost);
+    document.getElementById('transportResult').textContent = money(transportCost);
+    document.getElementById('fixedResult').textContent = money(fixedFee);
+    document.getElementById('totalResult').textContent = money(total);
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({behavior:'smooth'});
+  });
+</script>
+</body>
+</html>
